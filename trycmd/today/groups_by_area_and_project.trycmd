@@ -7,10 +7,10 @@ $ run.sh things3 --today-ts 1774396800 today
   Px ● Errands
     AE ▢ Project-only task
 
-  Cr ● Renovation
-    Ee ▢ Project task
-
   By ◆ Home
     Dr ▢ Area task
+
+  Cr ● Renovation
+    Ee ▢ Project task
 
 ```

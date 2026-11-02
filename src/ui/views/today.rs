@@ -119,6 +119,44 @@ fn group_regular_items<'a>(items: &'a [Task], store: &ThingsStore) -> GroupedSec
     grouped
 }
 
+enum SidebarGroup<'g, 'a> {
+    Project(&'g ThingsId, &'g Vec<&'a Task>),
+    Area(&'g ThingsId, &'g Vec<&'a Task>),
+}
+
+/// Order groups the way the Things sidebar does: projects without an area
+/// first, then each area followed by its projects.
+fn sidebar_ordered_groups<'g, 'a>(
+    grouped: &'g GroupedSection<'a>,
+    store: &ThingsStore,
+) -> Vec<SidebarGroup<'g, 'a>> {
+    let area_index = |area_uuid: &ThingsId| {
+        store
+            .areas_by_uuid
+            .get(area_uuid)
+            .map_or(i32::MAX, |area| area.index)
+    };
+
+    let mut keyed: Vec<((u8, i32, u8, i32), SidebarGroup<'g, 'a>)> = Vec::new();
+    for (project_uuid, tasks) in &grouped.by_project {
+        let project = store.tasks_by_uuid.get(project_uuid);
+        let project_index = project.map_or(i32::MAX, |p| p.index);
+        let key = match project.and_then(|p| store.effective_area_uuid(p)) {
+            Some(area_uuid) => (1, area_index(&area_uuid), 1, project_index),
+            None => (0, 0, 0, project_index),
+        };
+        keyed.push((key, SidebarGroup::Project(project_uuid, tasks)));
+    }
+    for (area_uuid, area_group) in &grouped.by_area {
+        let key = (1, area_index(area_uuid), 0, 0);
+        keyed.push((key, SidebarGroup::Area(area_uuid, &area_group.tasks)));
+    }
+
+    // Stable sort keeps first-seen order for ties.
+    keyed.sort_by_key(|(key, _)| *key);
+    keyed.into_iter().map(|(_, group)| group).collect()
+}
+
 fn evening_items(items: &[Task]) -> Vec<&Task> {
     items.iter().filter(|task| task.evening).collect()
 }
@@ -193,36 +231,30 @@ pub fn TodayView<'a>(hooks: Hooks, props: &TodayViewProps<'a>) -> impl Into<AnyE
                 );
             }
 
-            for (project_uuid, tasks) in &regular.by_project {
-                regular_blocks.push(
-                    element! {
-                        TaskGroup(
-                            header: Some(TaskGroupHeader::Project {
-                                project_uuid: project_uuid.clone(),
-                                title: store.resolve_project_title(project_uuid),
-                                id_prefix_len: prefix_len,
-                            }),
-                            items: tasks.clone(),
+            for group in sidebar_ordered_groups(&regular, store.as_ref()) {
+                let (header, tasks) = match group {
+                    SidebarGroup::Project(project_uuid, tasks) => (
+                        TaskGroupHeader::Project {
+                            project_uuid: project_uuid.clone(),
+                            title: store.resolve_project_title(project_uuid),
                             id_prefix_len: prefix_len,
-                            options: regular_options,
-                            indent_under_header: 2u16,
-                            hidden_count: 0usize,
-                        )
-                    }
-                    .into_any(),
-                );
-            }
-
-            for (area_uuid, area_group) in &regular.by_area {
+                        },
+                        tasks,
+                    ),
+                    SidebarGroup::Area(area_uuid, tasks) => (
+                        TaskGroupHeader::Area {
+                            area_uuid: area_uuid.clone(),
+                            title: store.resolve_area_title(area_uuid),
+                            id_prefix_len: prefix_len,
+                        },
+                        tasks,
+                    ),
+                };
                 regular_blocks.push(
                     element! {
                         TaskGroup(
-                            header: Some(TaskGroupHeader::Area {
-                                area_uuid: area_uuid.clone(),
-                                title: store.resolve_area_title(area_uuid),
-                                id_prefix_len: prefix_len,
-                            }),
-                            items: area_group.tasks.clone(),
+                            header: Some(header),
+                            items: tasks.clone(),
                             id_prefix_len: prefix_len,
                             options: regular_options,
                             indent_under_header: 2u16,

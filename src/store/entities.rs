@@ -205,6 +205,15 @@ impl Task {
         start_date <= *today
     }
 
+    /// Things keeps the evening bit after a task rolls over, but only shows
+    /// it under This Evening on the day it was scheduled for.
+    pub fn is_evening(&self, today: &DateTime<Utc>) -> bool {
+        self.evening
+            && self
+                .start_date
+                .is_none_or(|start_date| start_date.date_naive() == today.date_naive())
+    }
+
     pub fn is_staged_for_today(&self, today: &DateTime<Utc>) -> bool {
         let Some(start_date) = self.start_date else {
             return false;

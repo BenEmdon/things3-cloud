@@ -34,6 +34,10 @@ impl Command for TodayArgs {
             .tasks(Some(TaskStatus::Incomplete), Some(false), None)
             .into_iter()
             .filter(|t| !t.is_heading() && !t.is_blank() && (t.is_today(&today) || t.evening))
+            .map(|mut t| {
+                t.evening = t.is_evening(&today);
+                t
+            })
             .collect();
 
         today_items.sort_by_key(|task| {

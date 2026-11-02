@@ -1,3 +1,8 @@
+---
+name: things3-enrich-task
+description: Append context (research, links, key facts) to an existing Things 3 task's notes via the things3 CLI, or retitle/move a task. Use when the user wants to add notes or info to a task. Appends under a dated agent section and never rewrites the user's notes.
+---
+
 # Things 3: Enrich Task
 
 ## Purpose

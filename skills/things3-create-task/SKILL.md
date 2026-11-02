@@ -1,3 +1,8 @@
+---
+name: things3-create-task
+description: Create, schedule, or complete Things 3 tasks via the things3 CLI. Use when the user wants to add a todo, file a task in an area or project, set a when date or deadline, or mark a task done. Proposes the task and waits for approval before writing.
+---
+
 # Things 3: Create Task
 
 ## Purpose

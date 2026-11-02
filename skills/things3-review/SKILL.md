@@ -1,3 +1,8 @@
+---
+name: things3-review
+description: Read-only Things 3 access via the things3 CLI. Use for day reviews, checking Today/Upcoming/Inbox/Logbook, searching for tasks, finding overdue items, or listing areas, projects, and tags. Never writes.
+---
+
 # Things 3: Review
 
 ## Purpose

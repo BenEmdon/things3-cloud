@@ -133,6 +133,16 @@ impl FromStr for ThingsId {
     }
 }
 
+/// Whether `raw` is a legacy key that parses only by digesting the whole
+/// string, such as `CC-Things-Tag-Office` or `<UUID>-<YYYYMMDD>`. The cloud
+/// still knows these objects by the original string, so writes must use it.
+pub fn is_digested_legacy_key(raw: &str) -> bool {
+    Uuid::parse_str(raw.strip_prefix("ACTIONGROUP-").unwrap_or(raw)).is_err()
+        && raw
+            .parse::<ThingsId>()
+            .is_ok_and(|id| id.to_string() != raw)
+}
+
 impl Serialize for ThingsId {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.to_string())
@@ -363,6 +373,16 @@ mod tests {
         let compact = compact_for_legacy();
         let id: ThingsId = compact.parse().unwrap();
         assert_eq!(id.to_string(), compact);
+    }
+
+    #[test]
+    fn digested_legacy_keys_are_detected() {
+        assert!(is_digested_legacy_key("CC-Things-Tag-Office"));
+        assert!(is_digested_legacy_key(&format!("{LEGACY_UUID}-20200916")));
+        assert!(!is_digested_legacy_key(LEGACY_UUID));
+        assert!(!is_digested_legacy_key(LEGACY_ACTION_GROUP_ID));
+        assert!(!is_digested_legacy_key(&compact_for_legacy()));
+        assert!(!is_digested_legacy_key("not-a-things-id"));
     }
 
     #[test]

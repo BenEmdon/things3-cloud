@@ -18,6 +18,9 @@ use crate::{
 pub struct StateObject {
     pub entity_type: Option<EntityType>,
     pub properties: StateProperties,
+    /// Original key for objects whose ID had to be digested on parse.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wire_key: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -159,9 +162,17 @@ pub struct Task {
     pub repeater: Option<serde_json::Value>,
     pub recurrence_templates: Vec<ThingsId>,
     pub checklist_items: Vec<ChecklistItem>,
+    pub wire_key: Option<String>,
 }
 
 impl Task {
+    /// Key to use when writing this task back to Things Cloud.
+    pub fn wire_key(&self) -> String {
+        self.wire_key
+            .clone()
+            .unwrap_or_else(|| self.uuid.to_string())
+    }
+
     /// Neither a title nor notes: a blank row, not a notes-only capture.
     pub fn is_blank(&self) -> bool {
         self.title.trim().is_empty() && self.notes.as_deref().unwrap_or("").trim().is_empty()

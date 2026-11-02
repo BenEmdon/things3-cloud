@@ -131,7 +131,8 @@ impl ThingsStore {
                     let StateProperties::Task(props) = &obj.properties else {
                         continue;
                     };
-                    let task = self.parse_task(uuid, props, entity);
+                    let mut task = self.parse_task(uuid, props, entity);
+                    task.wire_key = obj.wire_key.clone();
                     self.tasks_by_uuid.insert(uuid.clone(), task);
                 }
                 Some(EntityType::Area2 | EntityType::Area3) => {
@@ -212,6 +213,7 @@ impl ThingsStore {
             repeater: p.repeater.clone(),
             recurrence_templates: p.recurrence_template_ids.clone(),
             checklist_items: Vec::new(),
+            wire_key: None,
         }
     }
 

@@ -1,0 +1,15 @@
+```trycmd
+$ run.sh things3 --today-ts 1699920000 delete VSF22xYnuKvwVge2M8uA5M
+× Deleted Weekly review  3C6BBD49-8D11-4FFF-8B0E-B8F33FA9C00A-20200916
+{
+  "ancestor_index": 0,
+  "changes": {
+    "3C6BBD49-8D11-4FFF-8B0E-B8F33FA9C00A-20200916": {
+      "e": "Task4",
+      "p": {},
+      "t": 2
+    }
+  }
+}
+
+```

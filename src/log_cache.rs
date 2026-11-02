@@ -37,7 +37,7 @@ struct StateCacheData {
     state: RawState,
 }
 
-const STATE_CACHE_VERSION: u8 = 3;
+const STATE_CACHE_VERSION: u8 = 4;
 
 fn read_cursor(path: &Path) -> CursorData {
     if !path.exists() {

@@ -60,10 +60,17 @@ fn build_delete_plan(args: &DeleteArgs, store: &crate::store::ThingsStore) -> De
         }
 
         if let Some(task) = task {
-            if !task.entity.can_upgrade_to_task7() {
+            // Current tasks are written as Task7. Legacy Task3/Task4 objects
+            // are deleted under their own entity type, which is how older
+            // clients removed them.
+            let entity = if task.entity.can_upgrade_to_task7() {
+                EntityType::Task7
+            } else if task.entity.is_task() {
+                task.entity.clone()
+            } else {
                 eprintln!("Unsupported task entity for deletion: {}", task.entity);
                 continue;
-            }
+            };
             if task.trashed {
                 eprintln!("Item already deleted: {}", task.title);
                 continue;
@@ -78,7 +85,7 @@ fn build_delete_plan(args: &DeleteArgs, store: &crate::store::ThingsStore) -> De
             if !seen.insert(task.uuid.clone()) {
                 continue;
             }
-            targets.push((task.uuid.to_string(), EntityType::Task7, task.title.clone()));
+            targets.push((task.wire_key(), entity, task.title.clone()));
             continue;
         }
 

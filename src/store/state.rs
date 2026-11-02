@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    ids::ThingsId,
+    ids::{ThingsId, is_digested_legacy_key},
     store::entities::{
         AreaStateProps, ChecklistItemStateProps, StateObject, StateProperties, TagStateProps,
         TaskStateProps,
@@ -156,13 +156,19 @@ fn wire_object_properties(obj: &WireObject) -> StateProperties {
     }
 }
 
-fn insert_state_object(state: &mut RawState, uuid: ThingsId, obj: WireObject) {
+fn insert_state_object(
+    state: &mut RawState,
+    uuid: ThingsId,
+    wire_key: Option<String>,
+    obj: WireObject,
+) {
     let properties = wire_object_properties(&obj);
     state.insert(
         uuid,
         StateObject {
             entity_type: obj.entity_type,
             properties,
+            wire_key,
         },
     );
 }
@@ -189,13 +195,14 @@ fn apply_update_payload(existing: &mut StateObject, payload: Properties) {
 }
 
 pub fn fold_item(item: WireItem, state: &mut RawState) {
-    for (uuid, obj) in item {
-        let Ok(uuid) = uuid.parse::<ThingsId>() else {
+    for (raw_key, obj) in item {
+        let Ok(uuid) = raw_key.parse::<ThingsId>() else {
             continue;
         };
+        let wire_key = is_digested_legacy_key(&raw_key).then_some(raw_key);
         match obj.operation_type {
             OperationType::Create => {
-                insert_state_object(state, uuid, obj);
+                insert_state_object(state, uuid, wire_key, obj);
             }
             OperationType::Update => {
                 if let Some(existing) = state.get_mut(&uuid) {
@@ -205,8 +212,11 @@ pub fn fold_item(item: WireItem, state: &mut RawState) {
                     if obj.entity_type.is_some() {
                         existing.entity_type = obj.entity_type.clone();
                     }
+                    if wire_key.is_some() {
+                        existing.wire_key = wire_key;
+                    }
                 } else {
-                    insert_state_object(state, uuid, obj);
+                    insert_state_object(state, uuid, wire_key, obj);
                 }
             }
             OperationType::Delete => {

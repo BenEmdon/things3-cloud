@@ -11,8 +11,8 @@ use uuid::Uuid;
 /// A Things 3 entity identifier.
 ///
 /// Internally stored as canonical 16 bytes (SHA1-truncated UUID digest).
-/// Hyphenated UUIDs, historical `ACTIONGROUP-<UUID>` IDs, and compact base58
-/// IDs are accepted at parse-time.
+/// Hyphenated UUIDs, historical `ACTIONGROUP-<UUID>` IDs, built-in
+/// `CC-Things-*` IDs, repeating-instance `<UUID>-<YYYYMMDD>` IDs, and compact base58 IDs are accepted at parse-time.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct ThingsId([u8; 16]);
 
@@ -88,6 +88,23 @@ impl FromStr for ThingsId {
         let uuid_candidate = s.strip_prefix("ACTIONGROUP-").unwrap_or(s);
         if let Ok(uuid) = Uuid::parse_str(uuid_candidate) {
             return Ok(ThingsId(uuid_to_bytes(&uuid)));
+        }
+        // Accounts seeded by early Things clients carry built-in starter
+        // entities with fixed, non-UUID IDs such as `CC-Things-Tag-Office`.
+        // Canonicalize them by digest so every reference resolves to one ID.
+        if s.starts_with("CC-Things-") {
+            return Ok(ThingsId(sha1_16(s.as_bytes())));
+        }
+        // Instances generated from a repeating template use the template UUID
+        // plus a `-YYYYMMDD` date suffix. Each instance is its own entity, so
+        // digest the whole ID rather than collapsing it onto the template.
+        if let Some((uuid, date)) = s.rsplit_once('-')
+            && date.len() == 8
+            && date.bytes().all(|b| b.is_ascii_digit())
+            && let Ok(uuid) = Uuid::parse_str(uuid)
+        {
+            let canonical = format!("{}-{date}", uuid.to_string().to_uppercase());
+            return Ok(ThingsId(sha1_16(canonical.as_bytes())));
         }
         if s.len() > 22 {
             return Err(ParseThingsIdError(s.to_owned()));
@@ -226,7 +243,11 @@ fn base58_decode(input: &str) -> Option<Vec<u8>> {
 
 fn uuid_to_bytes(uuid: &Uuid) -> [u8; 16] {
     let canonical = uuid.to_string().to_uppercase();
-    let digest = Sha1::digest(canonical.as_bytes());
+    sha1_16(canonical.as_bytes())
+}
+
+fn sha1_16(input: &[u8]) -> [u8; 16] {
+    let digest = Sha1::digest(input);
     let mut bytes = [0u8; 16];
     bytes.copy_from_slice(&digest[..16]);
     bytes
@@ -271,6 +292,35 @@ mod tests {
         let parsed: ThingsId = serde_json::from_str(&format!(r#""{LEGACY_ACTION_GROUP_ID}""#))
             .expect("deserialize legacy action-group ID");
         assert_eq!(parsed, LEGACY_UUID.parse().unwrap());
+    }
+
+    #[test]
+    fn parse_builtin_cc_things_id() {
+        let a: ThingsId = "CC-Things-Tag-Office".parse().unwrap();
+        let b: ThingsId = "CC-Things-Tag-Office".parse().unwrap();
+        let other: ThingsId = "CC-Things-Tag-Home".parse().unwrap();
+        assert_eq!(a, b);
+        assert_ne!(a, other);
+        assert_eq!(a, a.to_string().parse().unwrap());
+    }
+
+    #[test]
+    fn serde_deserialize_builtin_cc_things_id() {
+        let parsed: ThingsId = serde_json::from_str(r#""CC-Things-Tag-Errand""#)
+            .expect("deserialize built-in CC-Things ID");
+        assert_eq!(parsed, "CC-Things-Tag-Errand".parse().unwrap());
+    }
+
+    #[test]
+    fn parse_repeating_instance_id() {
+        let a: ThingsId = format!("{LEGACY_UUID}-20190815").parse().unwrap();
+        let lower: ThingsId = format!("{LEGACY_UUID_LOWER}-20190815").parse().unwrap();
+        let next: ThingsId = format!("{LEGACY_UUID}-20190822").parse().unwrap();
+        let template: ThingsId = LEGACY_UUID.parse().unwrap();
+        assert_eq!(a, lower);
+        assert_ne!(a, next);
+        assert_ne!(a, template);
+        assert!(format!("{LEGACY_UUID}-2019081").parse::<ThingsId>().is_err());
     }
 
     #[test]
